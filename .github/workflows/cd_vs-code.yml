@@ -31,5 +31,5 @@ jobs:
       - name: Deploy to the VM
         run: |
            echo "✅ Connected to EC2"
-           ssh -o StrictHostKeyChecking=no -i lav.pem ubuntu@15.206.205.127 -t "docker stop browser-vs-code || true && docker rm browser-vs-code || true && docker run --name browser-vs-code  -d -p 8080:8080 lavkushwaha01/browser-vs-code:latest"
+           ssh -o StrictHostKeyChecking=no -i lav.pem ubuntu@15.206.205.127 -t "docker stop browser-vs-code || true && docker rm browser-vs-code || true && docker container prune -f && docker run --name browser-vs-code  -d -p 8080:8080 lavkushwaha01/browser-vs-code:latest"
       

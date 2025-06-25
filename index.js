@@ -1,5 +1,6 @@
 import express from "express";
 import 'dotenv/config';
+import cors from "cors";
 
 import {
   AutoScalingClient,
@@ -8,12 +9,15 @@ import {
   TerminateInstanceInAutoScalingGroupCommand,
 } from "@aws-sdk/client-auto-scaling";
 
-import { EC2Client, DescribeInstancesCommand } from "@aws-sdk/client-ec2";
+import {
+  EC2Client,
+  DescribeInstancesCommand
+} from "@aws-sdk/client-ec2";
 
 const app = express();
 app.use(express.json());
+app.use(cors());
 
-// AWS Clients
 const client = new AutoScalingClient({
   region: "ap-south-1",
   credentials: {
@@ -30,10 +34,9 @@ const ec2Client = new EC2Client({
   },
 });
 
-// Track machine list
-const ALL_MACHINES = [];
+let ALL_MACHINES = [];
+const TERMINATE_TIMEOUTS = {}; // tab close ke baad 10 sec ke liye track karne ke liye
 
-/** Refresh EC2 instances and update ALL_MACHINES */
 async function refershInstances() {
   try {
     const autoScalingData = await client.send(new DescribeAutoScalingInstancesCommand());
@@ -45,52 +48,50 @@ async function refershInstances() {
       new DescribeInstancesCommand({ InstanceIds: instanceIds })
     );
 
-    ALL_MACHINES.length = 0; // clear old
+    const updatedMachines = [];
 
     ec2Response.Reservations.forEach((reservation) => {
       reservation.Instances.forEach((instance) => {
-        const publicIp = instance.PublicIpAddress;
-        if (publicIp) {
-          ALL_MACHINES.push({
+        if (instance.PublicIpAddress) {
+          const oldMachine = ALL_MACHINES.find(m => m.instanceId === instance.InstanceId);
+          updatedMachines.push({
             instanceId: instance.InstanceId,
-            ip: publicIp,
-            isUsed: false,
+            ip: instance.PublicIpAddress,
+            isUsed: oldMachine?.isUsed || false
           });
         }
       });
     });
 
+    ALL_MACHINES = updatedMachines;
     console.log("Machines refreshed:", ALL_MACHINES);
   } catch (err) {
-    console.error("Error refreshing instances:", err);
+    console.error(" Error refreshing instances:", err);
   }
 }
 
-// Initial load
 refershInstances();
-setInterval(refershInstances, 10000); // every 10s
+setInterval(refershInstances, 10000); 
 
-/** Assign idle machine to a project */
 app.get("/:projectId", async (req, res) => {
   const idleMachine = ALL_MACHINES.find(x => x.isUsed === false);
 
   if (!idleMachine) {
-    // Scale up
+    // koi idle machine nahi hai, naya machine start karna padega
     const newDesiredCapacity = ALL_MACHINES.length + 1;
     await client.send(new SetDesiredCapacityCommand({
       AutoScalingGroupName: "vs-code-asg",
       DesiredCapacity: newDesiredCapacity,
     }));
 
-    return res.status(503).json({
-      message: "No idle machine available. Scaling up...",
+    return res.status(200).json({
+      status: "starting"
     });
   }
 
-  // Mark machine busy
   idleMachine.isUsed = true;
 
-  // Optional: scale preemptively
+  // cheak kre ki agar idle machines ki count 1 se kam hai, to desired capacity increase kre
   const unusedCount = ALL_MACHINES.filter(x => !x.isUsed).length;
   if (unusedCount <= 1) {
     await client.send(new SetDesiredCapacityCommand({
@@ -105,19 +106,37 @@ app.get("/:projectId", async (req, res) => {
   });
 });
 
-/** Terminate machine manually */
 app.post("/destroy", async (req, res) => {
   const machineId = req.body.machineId;
 
-  await client.send(new TerminateInstanceInAutoScalingGroupCommand({
-    InstanceId: machineId,
-    ShouldDecrementDesiredCapacity: true,
-  }));
+  if (!machineId) {
+    return res.status(400).json({ error: "machineId is required" });
+  }
 
-  return res.json({ message: "Machine termination started." });
+  
+  if (TERMINATE_TIMEOUTS[machineId]) {
+    clearTimeout(TERMINATE_TIMEOUTS[machineId]);
+  }
+
+  TERMINATE_TIMEOUTS[machineId] = setTimeout(async () => {
+    try {
+      await client.send(new TerminateInstanceInAutoScalingGroupCommand({
+        InstanceId: machineId,
+        ShouldDecrementDesiredCapacity: true,
+      }));
+
+      ALL_MACHINES = ALL_MACHINES.filter(m => m.instanceId !== machineId);
+      delete TERMINATE_TIMEOUTS[machineId];
+
+      console.log(` Machine ${machineId} terminated after tab close.`);
+    } catch (err) {
+      console.error(` Error terminating machine ${machineId}:`, err);
+    }
+  }, 10000); // 10 sec delay termination ke liye
+
+  return res.json({ message: "Machine will be terminated in 10 seconds." });
 });
 
-// Start server
 app.listen(9092, '0.0.0.0', () => {
-  console.log("🚀 Server running on port 9092");
+  console.log(" Server running on port 9092");
 });

@@ -13,6 +13,7 @@
   "dependencies": {
     "@aws-sdk/client-auto-scaling": "^3.835.0",
     "@aws-sdk/client-ec2": "^3.836.0",
+    "cors": "^2.8.5",
     "dotenv": "^16.5.0"
   }
 }

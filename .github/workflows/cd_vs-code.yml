@@ -1,0 +1,35 @@
+name: Deploy frontend 
+on:
+ push: 
+  branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: cheak the code
+        uses: actions/checkout@v2
+
+      - name: Docker login
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push 
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: lavkushwaha01/browser-vs-code:latest  
+      - name: Decode SSH key
+        run: |
+              echo "${{ secrets.SSH_PRIVATE_KEY }}" | base64 -d > lav.pem
+              chmod 600 lav.pem
+  
+      - name: Deploy to the VM
+        run: |
+           echo "✅ Connected to EC2"
+           ssh -o StrictHostKeyChecking=no -i lav.pem ubuntu@15.206.205.127 -t "docker stop browser-vs-code || true && docker rm browser-vs-code || true && docker run --name browser-vs-code  -d -p 8080:8080 lavkushwaha01/browser-vs-code:latest"
+      

@@ -14,7 +14,7 @@ function App() {
       const data = await response.json();
 
       if (data.status === "starting") {
-        setStatusMessage("No idle machine. Starting a new one, please wait...");
+        setStatusMessage("No idle machine! Starting a new one, please wait...");
         setLoading(false);
         return;
       }

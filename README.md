@@ -100,7 +100,7 @@ Example snippet in your workflow:
         run: |
           curl http://<your-public-ip>:8080
 ```
-[View GitHub Actions Workflow](.github/workflows/cd_frontend.yml)
+[View GitHub Actions Workflow](./.github/workflows/cd_frontend.yml)
 
 ---
 

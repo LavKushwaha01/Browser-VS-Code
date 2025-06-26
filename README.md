@@ -110,12 +110,6 @@ Running EC2 instances will incur AWS charges. For testing, consider using the AW
 
 ---
 
-## 📄 License
-
-[MIT](./LICENSE)
-
----
-
 ## 🙋‍♂️ Contact & Support
 
 Questions or issues?  

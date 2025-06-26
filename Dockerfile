@@ -13,8 +13,6 @@ USER coder
 # Expose code-server's default port
 EXPOSE 8080
 
-
-# Set default theme to dark
 RUN mkdir -p /tmp/bolty-worker
 
 

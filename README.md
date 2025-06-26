@@ -108,7 +108,7 @@ Example:
         run: |
           curl http://<your-public-ip>:8080
 ```
-
+---
 
 > Built with ❤️ by Lav
 
